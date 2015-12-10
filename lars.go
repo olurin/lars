@@ -181,7 +181,7 @@ func (l *LARS) RegisterGlobalsFunc(fn GlobalsFunc) {
 
 func (l *LARS) add(method, path string, h Handler) {
 	path = l.prefix + path
-	l.router.Add(method, path, wrapHandler(h), l)
+	l.router.add(method, path, wrapHandler(h), l)
 	r := route{
 		Method:  method,
 		Path:    path,

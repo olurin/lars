@@ -49,7 +49,7 @@ func newRouter(e *LARS) *router {
 	}
 }
 
-func (r *router) Add(method, path string, h HandlerFunc, e *LARS) {
+func (r *router) add(method, path string, h HandlerFunc, e *LARS) {
 	ppath := path        // Pristine path
 	pnames := []string{} // Param names
 
@@ -90,7 +90,7 @@ func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string
 
 	cn := r.tree // Current node as root
 	if cn == nil {
-		panic("lars => invalid method")
+		panic("lars => invalid router initialization")
 	}
 	search := path
 
@@ -365,7 +365,6 @@ func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, e *LARS
 
 		// Match-any node
 	MatchAny:
-		// c = cn.getChild()
 		if cn = cn.findChildByKind(mkind); cn == nil {
 			// Not found
 			return
@@ -375,25 +374,31 @@ func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, e *LARS
 	}
 
 End:
+
 	ctx.path = cn.ppath
 	ctx.pnames = cn.pnames
 	h = cn.findHandler(method)
+
 	if cn.lars != nil {
 		e = cn.lars
 	}
 
 	// NOTE: Slow zone...
 	if h == nil {
+
 		h = cn.check405(e.lars)
 
 		// Dig further for match-any, might have an empty value for *, e.g.
 		if cn = cn.findChildByKind(mkind); cn == nil {
 			return
 		}
+
 		ctx.pvalues[len(cn.pnames)-1] = ""
+
 		if h = cn.findHandler(method); h == nil {
 			h = cn.check405(e.lars)
 		}
 	}
+
 	return
 }

@@ -58,6 +58,11 @@ func (c *Context) Param(name string) (value string) {
 	return
 }
 
+// Params returns contexts parameters
+func (c *Context) Params() []string {
+	return c.pnames
+}
+
 // Get retrieves data from the context.
 func (c *Context) Get(key string) interface{} {
 	return c.store[key]
