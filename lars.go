@@ -2,16 +2,16 @@ package lars
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
 	"runtime"
 	"sync"
-	"time"
 )
 
+// LARS struct containing all fields and methods for use
 type LARS struct {
+	RouteGroup
 	prefix     string
 	middleware []MiddlewareFunc
 	maxParam   *int
@@ -25,11 +25,23 @@ type route struct {
 	Handler Handler
 }
 
+// Middleware is the type used in registerig middleware.
+// NOTE: these middlewares may get wrapped by the MiddlewareFunc
+// type for chainging purposes internally.
 type Middleware interface{}
+
+// MiddlewareFunc is the final type used for the middleware and chaining of it
 type MiddlewareFunc func(HandlerFunc) HandlerFunc
+
+// Handler is the type used in registering handlers.
+// NOTE: these handlers may get wrapped by the HandlerFunc
+// type internally.
 type Handler interface{}
+
+// HandlerFunc is the internal handler type used for handlers.
 type HandlerFunc func(*Context)
 
+// HTTP Constant Terms and Variables
 const (
 	// CONNECT HTTP method
 	CONNECT = "CONNECT"
@@ -91,13 +103,6 @@ const (
 	WWWAuthenticate    = "WWW-Authenticate"
 	XForwardedFor      = "X-Forwarded-For"
 	XRealIP            = "X-Real-IP"
-	//-----------
-	// Protocols
-	//-----------
-
-	WebSocket = "websocket"
-
-	indexPage = "index.html"
 )
 
 var (
@@ -113,35 +118,23 @@ var (
 		TRACE,
 	}
 
-	//--------
-	// Errors
-	//--------
-
-	UnsupportedMediaType  = errors.New("unsupported media type")
-	RendererNotRegistered = errors.New("renderer not registered")
-	InvalidRedirectCode   = errors.New("invalid redirect status code")
-
 	//----------------
 	// Error handlers
 	//----------------
 
 	notFoundHandler = func(c *Context) {
 		http.Error(c.Response, "4040 not found", http.StatusNotFound)
-		// return nil
 	}
 
 	methodNotAllowedHandler = func(c *Context) {
 		http.Error(c.Response, "4040 not allowed", http.StatusMethodNotAllowed)
-		// return nil
-		// return NewHTTPError(http.StatusMethodNotAllowed)
 	}
-
-	unixEpochTime = time.Unix(0, 0)
 )
 
 // New creates an instance of lars.
 func New() *LARS {
 	e := &LARS{maxParam: new(int)}
+	e.RouteGroup = RouteGroup{e}
 	e.pool.New = func() interface{} {
 		return &Context{
 			Request:  nil,
@@ -156,77 +149,6 @@ func New() *LARS {
 	return e
 }
 
-// // Router returns router.
-// func (e *LARS) Router() *Router {
-// 	return e.router
-// }
-
-// Use adds handler to the middleware chain.
-func (e *LARS) Use(m ...Middleware) {
-	for _, h := range m {
-		e.middleware = append(e.middleware, wrapMiddleware(h))
-	}
-}
-
-// Connect adds a CONNECT route > handler to the router.
-func (e *LARS) Connect(path string, h Handler) {
-	e.add(CONNECT, path, h)
-}
-
-// Delete adds a DELETE route > handler to the router.
-func (e *LARS) Delete(path string, h Handler) {
-	e.add(DELETE, path, h)
-}
-
-// Get adds a GET route > handler to the router.
-func (e *LARS) Get(path string, h Handler) {
-	e.add(GET, path, h)
-}
-
-// Head adds a HEAD route > handler to the router.
-func (e *LARS) Head(path string, h Handler) {
-	e.add(HEAD, path, h)
-}
-
-// Options adds an OPTIONS route > handler to the router.
-func (e *LARS) Options(path string, h Handler) {
-	e.add(OPTIONS, path, h)
-}
-
-// Patch adds a PATCH route > handler to the router.
-func (e *LARS) Patch(path string, h Handler) {
-	e.add(PATCH, path, h)
-}
-
-// Post adds a POST route > handler to the router.
-func (e *LARS) Post(path string, h Handler) {
-	e.add(POST, path, h)
-}
-
-// Put adds a PUT route > handler to the router.
-func (e *LARS) Put(path string, h Handler) {
-	e.add(PUT, path, h)
-}
-
-// Trace adds a TRACE route > handler to the router.
-func (e *LARS) Trace(path string, h Handler) {
-	e.add(TRACE, path, h)
-}
-
-// Any adds a route > handler to the router for all HTTP methods.
-func (e *LARS) Any(path string, h Handler) {
-	for _, m := range methods {
-		e.add(m, path, h)
-	}
-}
-
-// Match adds a route > handler to the router for multiple HTTP methods provided.
-func (e *LARS) Match(methods []string, path string, h Handler) {
-	for _, m := range methods {
-		e.add(m, path, h)
-	}
-}
-
 func (e *LARS) add(method, path string, h Handler) {
 	path = e.prefix + path
 	e.router.Add(method, path, wrapHandler(h), e)
@@ -236,22 +158,6 @@ func (e *LARS) add(method, path string, h Handler) {
 		Handler: runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name(),
 	}
 	e.router.routes = append(e.router.routes, r)
-}
-
-// Group creates a new sub router with prefix. It inherits all properties from
-// the parent. Passing middleware overrides parent middleware.
-func (e *LARS) Group(prefix string, m ...Middleware) *Group {
-	g := &Group{*e}
-	g.lars.prefix += prefix
-	if len(m) == 0 {
-		mw := make([]MiddlewareFunc, len(g.lars.middleware))
-		copy(mw, g.lars.middleware)
-		g.lars.middleware = mw
-	} else {
-		g.lars.middleware = nil
-		g.Use(m...)
-	}
-	return g
 }
 
 // URI generates a URI from handler.
@@ -284,11 +190,6 @@ func (e *LARS) URL(h Handler, params ...interface{}) string {
 	return e.URI(h, params...)
 }
 
-// // Routes returns the registered routes.
-// func (e *LARS) Routes() []Route {
-// 	return e.router.routes
-// }
-
 // ServeHTTP implements `http.Handler` interface, which serves HTTP requests.
 func (e *LARS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
@@ -305,76 +206,4 @@ func (e *LARS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h(c)
 
 	e.pool.Put(c)
-}
-
-// wrapMiddleware wraps middleware.
-func wrapMiddleware(m Middleware) MiddlewareFunc {
-	switch m := m.(type) {
-	case MiddlewareFunc:
-		return m
-	case func(HandlerFunc) HandlerFunc:
-		return m
-	case HandlerFunc:
-		return wrapHandlerFuncMW(m)
-	case func(*Context):
-		return wrapHandlerFuncMW(m)
-	case func(http.Handler) http.Handler:
-		return func(h HandlerFunc) HandlerFunc {
-			return func(c *Context) {
-				m(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					h(c)
-				})).ServeHTTP(c.Response, c.Request)
-			}
-		}
-	case http.Handler:
-		return wrapHTTPHandlerFuncMW(m.ServeHTTP)
-	case func(http.ResponseWriter, *http.Request):
-		return wrapHTTPHandlerFuncMW(m)
-	default:
-		panic("unknown middleware")
-	}
-}
-
-// wrapHandlerFuncMW wraps HandlerFunc middleware.
-func wrapHandlerFuncMW(m HandlerFunc) MiddlewareFunc {
-	return func(h HandlerFunc) HandlerFunc {
-		return func(c *Context) {
-			if m(c); c.Response.status != http.StatusOK || c.Response.committed {
-				return
-			}
-			h(c)
-		}
-	}
-}
-
-// wrapHTTPHandlerFuncMW wraps http.HandlerFunc middleware.
-func wrapHTTPHandlerFuncMW(m http.HandlerFunc) MiddlewareFunc {
-	return func(h HandlerFunc) HandlerFunc {
-		return func(c *Context) {
-			if !c.Response.committed {
-				m.ServeHTTP(c.Response, c.Request)
-			}
-			h(c)
-		}
-	}
-}
-
-// wrapHandler wraps handler.
-func wrapHandler(h Handler) HandlerFunc {
-	switch h := h.(type) {
-	case HandlerFunc:
-		return h
-	case func(*Context):
-		return h
-	case http.Handler, http.HandlerFunc:
-		return func(c *Context) {
-			h.(http.Handler).ServeHTTP(c.Response, c.Request)
-		}
-	case func(http.ResponseWriter, *http.Request):
-		return func(c *Context) {
-			h(c.Response, c.Request)
-		}
-	default:
-		panic("unknown handler")
-	}
 }
