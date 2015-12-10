@@ -92,10 +92,10 @@ func (r *Response) Committed() bool {
 	return r.committed
 }
 
-func (r *Response) reset(w http.ResponseWriter, e *LARS) {
+func (r *Response) reset(w http.ResponseWriter, l *LARS) {
 	r.ResponseWriter = w
 	r.size = 0
 	r.status = http.StatusOK
 	r.committed = false
-	r.lars = e
+	r.lars = l
 }

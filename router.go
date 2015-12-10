@@ -39,53 +39,53 @@ const (
 )
 
 // newRouter returns a new *router instance
-func newRouter(e *LARS) *router {
+func newRouter(l *LARS) *router {
 	return &router{
 		tree: &node{
 			methodHandler: new(methodHandler),
 		},
 		routes: []route{},
-		lars:   e,
+		lars:   l,
 	}
 }
 
-func (r *router) add(method, path string, h HandlerFunc, e *LARS) {
+func (r *router) add(method, path string, h HandlerFunc, l *LARS) {
 	ppath := path        // Pristine path
 	pnames := []string{} // Param names
 
-	for i, l := 0, len(path); i < l; i++ {
+	for i, k := 0, len(path); i < k; i++ {
 		if path[i] == ':' {
 			j := i + 1
 
-			r.insert(method, path[:i], nil, skind, "", nil, e)
-			for ; i < l && path[i] != '/'; i++ {
+			r.insert(method, path[:i], nil, skind, "", nil, l)
+			for ; i < k && path[i] != '/'; i++ {
 			}
 
 			pnames = append(pnames, path[j:i])
 			path = path[:j] + path[i:]
-			i, l = j, len(path)
+			i, k = j, len(path)
 
-			if i == l {
-				r.insert(method, path[:i], h, pkind, ppath, pnames, e)
+			if i == k {
+				r.insert(method, path[:i], h, pkind, ppath, pnames, l)
 				return
 			}
-			r.insert(method, path[:i], nil, pkind, ppath, pnames, e)
+			r.insert(method, path[:i], nil, pkind, ppath, pnames, l)
 		} else if path[i] == '*' {
-			r.insert(method, path[:i], nil, skind, "", nil, e)
+			r.insert(method, path[:i], nil, skind, "", nil, l)
 			pnames = append(pnames, "_*")
-			r.insert(method, path[:i+1], h, mkind, ppath, pnames, e)
+			r.insert(method, path[:i+1], h, mkind, ppath, pnames, l)
 			return
 		}
 	}
 
-	r.insert(method, path, h, skind, ppath, pnames, e)
+	r.insert(method, path, h, skind, ppath, pnames, l)
 }
 
-func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string, pnames []string, e *LARS) {
+func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string, pnames []string, l *LARS) {
 	// Adjust max param
-	l := len(pnames)
-	if *e.maxParam < l {
-		*e.maxParam = l
+	j := len(pnames)
+	if *l.maxParam < j {
+		*l.maxParam = j
 	}
 
 	cn := r.tree // Current node as root
@@ -97,17 +97,17 @@ func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string
 	for {
 		sl := len(search)
 		pl := len(cn.prefix)
-		l := 0
+		j := 0
 
 		// LCP
 		max := pl
 		if sl < max {
 			max = sl
 		}
-		for ; l < max && search[l] == cn.prefix[l]; l++ {
+		for ; j < max && search[j] == cn.prefix[j]; j++ {
 		}
 
-		if l == 0 {
+		if j == 0 {
 			// At root node
 			cn.label = search[0]
 			cn.prefix = search
@@ -116,16 +116,16 @@ func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string
 				cn.addHandler(method, h)
 				cn.ppath = ppath
 				cn.pnames = pnames
-				cn.lars = e
+				cn.lars = l
 			}
-		} else if l < pl {
+		} else if j < pl {
 			// Split node
-			n := newNode(cn.kind, cn.prefix[l:], cn, cn.children, cn.methodHandler, cn.ppath, cn.pnames, cn.lars)
+			n := newNode(cn.kind, cn.prefix[j:], cn, cn.children, cn.methodHandler, cn.ppath, cn.pnames, cn.lars)
 
 			// Reset parent node
 			cn.kind = skind
 			cn.label = cn.prefix[0]
-			cn.prefix = cn.prefix[:l]
+			cn.prefix = cn.prefix[:j]
 			cn.children = nil
 			cn.methodHandler = new(methodHandler)
 			cn.ppath = ""
@@ -134,21 +134,21 @@ func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string
 
 			cn.addChild(n)
 
-			if l == sl {
+			if j == sl {
 				// At parent node
 				cn.kind = t
 				cn.addHandler(method, h)
 				cn.ppath = ppath
 				cn.pnames = pnames
-				cn.lars = e
+				cn.lars = l
 			} else {
 				// Create child node
-				n = newNode(t, search[l:], cn, nil, new(methodHandler), ppath, pnames, e)
+				n = newNode(t, search[j:], cn, nil, new(methodHandler), ppath, pnames, l)
 				n.addHandler(method, h)
 				cn.addChild(n)
 			}
-		} else if l < sl {
-			search = search[l:]
+		} else if j < sl {
+			search = search[j:]
 			c := cn.findChildWithLabel(search[0])
 			if c != nil {
 				// Go deeper
@@ -156,7 +156,7 @@ func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string
 				continue
 			}
 			// Create child node
-			n := newNode(t, search, cn, nil, new(methodHandler), ppath, pnames, e)
+			n := newNode(t, search, cn, nil, new(methodHandler), ppath, pnames, l)
 			n.addHandler(method, h)
 			cn.addChild(n)
 		} else {
@@ -165,14 +165,14 @@ func (r *router) insert(method, path string, h HandlerFunc, t kind, ppath string
 				cn.addHandler(method, h)
 				cn.ppath = path
 				cn.pnames = pnames
-				cn.lars = e
+				cn.lars = l
 			}
 		}
 		return
 	}
 }
 
-func newNode(t kind, pre string, p *node, c children, mh *methodHandler, ppath string, pnames []string, e *LARS) *node {
+func newNode(t kind, pre string, p *node, c children, mh *methodHandler, ppath string, pnames []string, l *LARS) *node {
 	return &node{
 		kind:          t,
 		label:         pre[0],
@@ -182,7 +182,7 @@ func newNode(t kind, pre string, p *node, c children, mh *methodHandler, ppath s
 		ppath:         ppath,
 		pnames:        pnames,
 		methodHandler: mh,
-		lars:          e,
+		lars:          l,
 	}
 }
 
@@ -274,9 +274,9 @@ func (n *node) check405(l *LARS) HandlerFunc {
 	return l.http404
 }
 
-func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, e *LARS) {
+func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, l *LARS) {
 	h = r.lars.http404
-	e = r.lars
+	l = r.lars
 	cn := r.tree // Current node as root
 
 	var (
@@ -295,7 +295,7 @@ func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, e *LARS
 		}
 
 		pl := 0 // Prefix length
-		l := 0  // LCP length
+		i := 0  // LCP length
 
 		if cn.label != ':' {
 			sl := len(search)
@@ -306,13 +306,13 @@ func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, e *LARS
 			if sl < max {
 				max = sl
 			}
-			for ; l < max && search[l] == cn.prefix[l]; l++ {
+			for ; i < max && search[i] == cn.prefix[i]; i++ {
 			}
 		}
 
-		if l == pl {
+		if i == pl {
 			// Continue search
-			search = search[l:]
+			search = search[i:]
 		} else {
 			cn = nn
 			search = ns
@@ -354,8 +354,8 @@ func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, e *LARS
 				ns = search
 			}
 			cn = c
-			i, l := 0, len(search)
-			for ; i < l && search[i] != '/'; i++ {
+			i, j := 0, len(search)
+			for ; i < j && search[i] != '/'; i++ {
 			}
 			ctx.pvalues[n] = search[:i]
 			n++
@@ -380,13 +380,13 @@ End:
 	h = cn.findHandler(method)
 
 	if cn.lars != nil {
-		e = cn.lars
+		l = cn.lars
 	}
 
 	// NOTE: Slow zone...
 	if h == nil {
 
-		h = cn.check405(e.lars)
+		h = cn.check405(l.lars)
 
 		// Dig further for match-any, might have an empty value for *, e.g.
 		if cn = cn.findChildByKind(mkind); cn == nil {
@@ -396,7 +396,7 @@ End:
 		ctx.pvalues[len(cn.pnames)-1] = ""
 
 		if h = cn.findHandler(method); h == nil {
-			h = cn.check405(e.lars)
+			h = cn.check405(l.lars)
 		}
 	}
 

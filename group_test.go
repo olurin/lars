@@ -75,7 +75,6 @@ func TestGroup(t *testing.T) {
 	Equal(t, s, "405 method not allowed\n")
 
 	fn := func() MiddlewareFunc {
-
 		return func(h HandlerFunc) HandlerFunc {
 			return func(c *Context) {
 				h(c)
