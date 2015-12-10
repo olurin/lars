@@ -10,15 +10,25 @@ import (
 // Context represents context for the current request. It holds request and
 // response objects, path parameters, data and registered handler.
 type Context struct {
-	Request  *http.Request
-	Response *Response
-	path     string
-	pnames   []string
-	pvalues  []string
-	store    store
-	lars     *LARS
+	Request       *http.Request
+	Response      *Response
+	Globals       IGlobals
+	path          string
+	pnames        []string
+	pvalues       []string
+	store         store
+	globalsExists bool
 }
+
 type store map[string]interface{}
+
+// IGlobals is an interface for a globals http request object that can be passed
+// around and allocated efficiently; and most importantly is not tied to the
+// context object and can be passed around separately if desired instead of Context
+// being the interface.
+type IGlobals interface {
+	Reset()
+}
 
 var _ context.Context = &Context{}
 
@@ -172,5 +182,8 @@ func (c *Context) reset(r *http.Request, w http.ResponseWriter, e *LARS) {
 	c.Request = r
 	c.Response.reset(w, e)
 	c.store = nil
-	c.lars = e
+
+	if c.globalsExists {
+		c.Globals.Reset()
+	}
 }

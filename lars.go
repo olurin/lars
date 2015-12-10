@@ -12,11 +12,14 @@ import (
 // LARS struct containing all fields and methods for use
 type LARS struct {
 	RouteGroup
-	prefix     string
-	middleware []MiddlewareFunc
-	maxParam   *int
-	pool       sync.Pool
-	router     *router
+	prefix        string
+	middleware    []MiddlewareFunc
+	maxParam      *int
+	pool          sync.Pool
+	router        *router
+	http404       HandlerFunc
+	newGlobals    GlobalsFunc
+	globalsExists bool
 }
 
 type route struct {
@@ -40,6 +43,9 @@ type Handler interface{}
 
 // HandlerFunc is the internal handler type used for handlers.
 type HandlerFunc func(*Context)
+
+// GlobalsFunc is a function that creates a new Global object to be passed around the request
+type GlobalsFunc func() IGlobals
 
 // HTTP Constant Terms and Variables
 const (
@@ -103,6 +109,9 @@ const (
 	WWWAuthenticate    = "WWW-Authenticate"
 	XForwardedFor      = "X-Forwarded-For"
 	XRealIP            = "X-Real-IP"
+
+	default404Body = "404 page not found"
+	default405Body = "405 method not allowed"
 )
 
 var (
@@ -122,51 +131,72 @@ var (
 	// Error handlers
 	//----------------
 
-	notFoundHandler = func(c *Context) {
-		http.Error(c.Response, "4040 not found", http.StatusNotFound)
+	defaultNotFoundHandler = func(c *Context) {
+		http.Error(c.Response, default404Body, http.StatusNotFound)
 	}
 
 	methodNotAllowedHandler = func(c *Context) {
-		http.Error(c.Response, "4040 not allowed", http.StatusMethodNotAllowed)
+		http.Error(c.Response, default405Body, http.StatusMethodNotAllowed)
 	}
 )
 
 // New creates an instance of lars.
 func New() *LARS {
-	e := &LARS{maxParam: new(int)}
-	e.RouteGroup = RouteGroup{e}
-	e.pool.New = func() interface{} {
+	l := &LARS{
+		maxParam: new(int),
+		http404:  defaultNotFoundHandler,
+		newGlobals: func() IGlobals {
+			return nil
+		},
+	}
+	l.RouteGroup = RouteGroup{l}
+	l.pool.New = func() interface{} {
 		return &Context{
-			Request:  nil,
-			Response: new(Response),
-			lars:     e,
-			pvalues:  make([]string, *e.maxParam),
-			store:    make(store),
+			Request:       nil,
+			Response:      new(Response),
+			pvalues:       make([]string, *l.maxParam),
+			store:         make(store),
+			Globals:       l.newGlobals(),
+			globalsExists: l.globalsExists,
 		}
 	}
-	e.router = newRouter(e)
+	l.router = newRouter(l)
 
-	return e
+	return l
 }
 
-func (e *LARS) add(method, path string, h Handler) {
-	path = e.prefix + path
-	e.router.Add(method, path, wrapHandler(h), e)
+// RegisterNotFoundFunc alows for overriding of the not found handler function.
+// Here can set redirecting to about to about/ or about/ to about
+// and all your other SEO needs
+func (l *LARS) RegisterNotFoundFunc(notFound HandlerFunc) {
+	l.http404 = notFound
+}
+
+// RegisterGlobalsFunc registers a custom globals function for creation
+// and resetting of a global object passed per http request
+func (l *LARS) RegisterGlobalsFunc(fn GlobalsFunc) {
+	l.newGlobals = fn
+	l.globalsExists = true
+}
+
+func (l *LARS) add(method, path string, h Handler) {
+	path = l.prefix + path
+	l.router.Add(method, path, wrapHandler(h), l)
 	r := route{
 		Method:  method,
 		Path:    path,
 		Handler: runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name(),
 	}
-	e.router.routes = append(e.router.routes, r)
+	l.router.routes = append(l.router.routes, r)
 }
 
 // URI generates a URI from handler.
-func (e *LARS) URI(h Handler, params ...interface{}) string {
+func (l *LARS) URI(h Handler, params ...interface{}) string {
 	uri := new(bytes.Buffer)
 	pl := len(params)
 	n := 0
 	hn := runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name()
-	for _, r := range e.router.routes {
+	for _, r := range l.router.routes {
 		if r.Handler == hn {
 			for i, l := 0, len(r.Path); i < l; i++ {
 				if r.Path[i] == ':' && n < pl {
@@ -186,24 +216,24 @@ func (e *LARS) URI(h Handler, params ...interface{}) string {
 }
 
 // URL is an alias for `URI` function.
-func (e *LARS) URL(h Handler, params ...interface{}) string {
-	return e.URI(h, params...)
+func (l *LARS) URL(h Handler, params ...interface{}) string {
+	return l.URI(h, params...)
 }
 
 // ServeHTTP implements `http.Handler` interface, which serves HTTP requests.
-func (e *LARS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (l *LARS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	c := e.pool.Get().(*Context)
-	h, e := e.router.Find(r.Method, r.URL.Path, c)
-	c.reset(r, w, e)
+	c := l.pool.Get().(*Context)
+	h, l := l.router.Find(r.Method, r.URL.Path, c)
+	c.reset(r, w, l)
 
 	// Chain middleware with handler in the end
-	for i := len(e.middleware) - 1; i >= 0; i-- {
-		h = e.middleware[i](h)
+	for i := len(l.middleware) - 1; i >= 0; i-- {
+		h = l.middleware[i](h)
 	}
 
 	// Execute chain
 	h(c)
 
-	e.pool.Put(c)
+	l.pool.Put(c)
 }
