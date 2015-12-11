@@ -12,14 +12,13 @@ import (
 // LARS struct containing all fields and methods for use
 type LARS struct {
 	RouteGroup
-	prefix        string
-	middleware    []MiddlewareFunc
-	maxParam      *int
-	pool          sync.Pool
-	router        *router
-	http404       HandlerFunc
-	newGlobals    GlobalsFunc
-	globalsExists bool
+	prefix     string
+	middleware []MiddlewareFunc
+	maxParam   *int
+	pool       sync.Pool
+	router     *router
+	http404    HandlerFunc
+	newGlobals GlobalsFunc
 
 	// Enables automatic redirection if the current route can't be matched but a
 	// handler for the path with (without) the trailing slash exists.
@@ -167,12 +166,11 @@ func New() *LARS {
 	l.RouteGroup = RouteGroup{l}
 	l.pool.New = func() interface{} {
 		return &Context{
-			Request:       nil,
-			Response:      new(Response),
-			pvalues:       make([]string, *l.maxParam),
-			store:         make(store),
-			Globals:       l.newGlobals(),
-			globalsExists: l.globalsExists,
+			Request:  nil,
+			Response: new(Response),
+			pvalues:  make([]string, *l.maxParam),
+			store:    make(store),
+			Globals:  l.newGlobals(),
 		}
 	}
 	l.router = newRouter(l)
@@ -191,7 +189,6 @@ func (l *LARS) RegisterNotFoundFunc(notFound HandlerFunc) {
 // and resetting of a global object passed per http request
 func (l *LARS) RegisterGlobalsFunc(fn GlobalsFunc) {
 	l.newGlobals = fn
-	l.globalsExists = true
 }
 
 func (l *LARS) add(method, path string, h Handler) {
@@ -239,7 +236,7 @@ func (l *LARS) URL(h Handler, params ...interface{}) string {
 func (l *LARS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	c := l.pool.Get().(*Context)
-	h, l := l.router.Find(r.Method, r.URL.Path, c)
+	h, l := l.router.find(r.Method, r.URL.Path, c)
 	c.reset(r, w, l)
 
 	// Chain middleware with handler in the end

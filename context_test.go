@@ -37,13 +37,13 @@ func TestContextPath(t *testing.T) {
 	r.add(GET, "/users/:id", nil, l)
 	c := l.pool.New().(*Context)
 
-	r.Find(GET, "/users/1", c)
+	r.find(GET, "/users/1", c)
 	Equal(t, c.Path(), "/users/:id")
 
 	r.add(GET, "/users/:uid/files/:fid", nil, l)
 	c = l.pool.New().(*Context)
 
-	r.Find(GET, "/users/1/files/1", c)
+	r.find(GET, "/users/1/files/1", c)
 	Equal(t, c.Path(), "/users/:uid/files/:fid")
 }
 
@@ -71,7 +71,7 @@ func TestGetSet(t *testing.T) {
 	}, l)
 
 	c := l.pool.New().(*Context)
-	h, _ := r.Find(GET, path, c)
+	h, _ := r.find(GET, path, c)
 	NotEqual(t, h, nil)
 	h(c)
 	Equal(t, path, c.Get("path"))

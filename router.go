@@ -279,11 +279,11 @@ func (n *node) check405(l *LARS) HandlerFunc {
 	return nil
 }
 
-func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, l *LARS) {
-	return r.find(method, path, ctx, r.lars.FixTrailingSlash, false)
+func (r *router) find(method, path string, ctx *Context) (h HandlerFunc, l *LARS) {
+	return r.findInner(method, path, ctx, r.lars.FixTrailingSlash, false)
 }
 
-func (r *router) find(method, path string, ctx *Context, fixTrailingSlash bool, callingFromNotFound bool) (h HandlerFunc, l *LARS) {
+func (r *router) findInner(method, path string, ctx *Context, fixTrailingSlash bool, callingFromNotFound bool) (h HandlerFunc, l *LARS) {
 	l = r.lars
 	cn := r.tree // Current node as root
 
@@ -437,7 +437,7 @@ NotFound:
 	path = strings.ToLower(path)
 
 	// Check Same path, but all lowercase
-	if h, l = r.find(method, path, ctx, false, true); h != nil {
+	if h, l = r.findInner(method, path, ctx, false, true); h != nil {
 		h = redirect(path, method)
 		return
 	}
@@ -450,7 +450,7 @@ NotFound:
 	}
 
 	// Check lowercased path with opposite adding or removing slash
-	if h, l = r.find(method, path, ctx, false, true); h != nil {
+	if h, l = r.findInner(method, path, ctx, false, true); h != nil {
 		h = redirect(path, method)
 		return
 	}

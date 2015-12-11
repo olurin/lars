@@ -297,7 +297,7 @@ func TestRouterStatic(t *testing.T) {
 	r.add(GET, path, fn, l)
 
 	c := l.pool.New().(*Context)
-	h, _ := r.Find(GET, path, c)
+	h, _ := r.find(GET, path, c)
 	Equal(t, fmt.Sprint(h), fmt.Sprint(fn))
 }
 
@@ -308,7 +308,7 @@ func TestRouterParam(t *testing.T) {
 
 	c := l.pool.New().(*Context)
 
-	h, _ := r.Find(GET, "/users/1", c)
+	h, _ := r.find(GET, "/users/1", c)
 	NotEqual(t, h, nil)
 	Equal(t, "1", c.P(0))
 }
@@ -319,7 +319,7 @@ func TestRouterTwoParam(t *testing.T) {
 	r.add(GET, "/users/:uid/files/:fid", func(*Context) {}, l)
 	c := l.pool.New().(*Context)
 
-	h, _ := r.Find(GET, "/users/1/files/1", c)
+	h, _ := r.find(GET, "/users/1/files/1", c)
 	NotEqual(t, h, nil)
 	Equal(t, "1", c.P(0))
 	Equal(t, "1", c.P(1))
@@ -336,15 +336,15 @@ func TestRouterMatchAny(t *testing.T) {
 
 	c := l.pool.New().(*Context)
 
-	h, _ := r.Find(GET, "/", c)
+	h, _ := r.find(GET, "/", c)
 	NotEqual(t, h, nil)
 	Equal(t, "", c.P(0))
 
-	h, _ = r.Find(GET, "/download", c)
+	h, _ = r.find(GET, "/download", c)
 	NotEqual(t, h, nil)
 	Equal(t, "download", c.P(0))
 
-	h, _ = r.Find(GET, "/users/joe", c)
+	h, _ = r.find(GET, "/users/joe", c)
 	NotEqual(t, h, nil)
 	Equal(t, "joe", c.P(0))
 }
@@ -364,7 +364,7 @@ func TestRouterMicroParam(t *testing.T) {
 
 	c := l.pool.New().(*Context)
 
-	h, _ := r.Find(GET, "/1/2/3", c)
+	h, _ := r.find(GET, "/1/2/3", c)
 	NotEqual(t, h, nil)
 	Equal(t, "1", c.P(0))
 	Equal(t, "2", c.P(1))
@@ -380,7 +380,7 @@ func TestRouterMixParamMatchAny(t *testing.T) {
 
 	c := l.pool.New().(*Context)
 
-	h, _ := r.Find(GET, "/users/joe/comments", c)
+	h, _ := r.find(GET, "/users/joe/comments", c)
 	NotEqual(t, h, nil)
 
 	h(c)
@@ -400,13 +400,13 @@ func TestRouterMultiRoute(t *testing.T) {
 	c := l.pool.New().(*Context)
 
 	// Route > /users
-	h, _ := r.Find(GET, "/users", c)
+	h, _ := r.find(GET, "/users", c)
 	NotEqual(t, h, nil)
 	h(c)
 	Equal(t, fmt.Sprint(h), fmt.Sprint(fn))
 
 	// Route > /users/:id
-	h, _ = r.Find(GET, "/users/1", c)
+	h, _ = r.find(GET, "/users/1", c)
 	NotEqual(t, h, nil)
 	Equal(t, fmt.Sprint(h), fmt.Sprint(fn))
 	Equal(t, "1", c.P(0))
@@ -483,13 +483,13 @@ func TestRouterParamNames(t *testing.T) {
 	Equal(t, s, "/users")
 
 	// Route > /users/:id
-	h, _ := r.Find(GET, "/users/1", c)
+	h, _ := r.find(GET, "/users/1", c)
 	NotEqual(t, h, nil)
 	Equal(t, "1", c.Param("id"))
 	Equal(t, "1", c.P(0))
 
 	// Route > /users/:uid/files/:fid
-	h, _ = r.Find(GET, "/users/1/files/2", c)
+	h, _ = r.find(GET, "/users/1/files/2", c)
 	NotEqual(t, h, nil)
 	Equal(t, "1", c.Param("uid"))
 	Equal(t, "1", c.P(0))
@@ -509,7 +509,7 @@ func TestRouterAPI(t *testing.T) {
 
 	for _, route := range api {
 
-		h, _ := r.Find(route.Method, route.Path, c)
+		h, _ := r.find(route.Method, route.Path, c)
 		NotEqual(t, h, nil)
 
 		for i, n := range c.Params() {

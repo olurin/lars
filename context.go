@@ -10,14 +10,13 @@ import (
 // Context represents context for the current request. It holds request and
 // response objects, path parameters, data and registered handler.
 type Context struct {
-	Request       *http.Request
-	Response      *Response
-	Globals       IGlobals
-	path          string
-	pnames        []string
-	pvalues       []string
-	store         store
-	globalsExists bool
+	Request  *http.Request
+	Response *Response
+	Globals  IGlobals
+	path     string
+	pnames   []string
+	pvalues  []string
+	store    store
 }
 
 type store map[string]interface{}
@@ -188,7 +187,7 @@ func (c *Context) reset(r *http.Request, w http.ResponseWriter, e *LARS) {
 	c.Response.reset(w, e)
 	c.store = nil
 
-	if c.globalsExists {
+	if c.Globals != nil {
 		c.Globals.Reset()
 	}
 }
