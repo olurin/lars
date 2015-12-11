@@ -1,5 +1,10 @@
 package lars
 
+import (
+	"net/http"
+	"strings"
+)
+
 type router struct {
 	tree   *node
 	routes []route
@@ -271,11 +276,14 @@ func (n *node) check405(l *LARS) HandlerFunc {
 			return methodNotAllowedHandler
 		}
 	}
-	return l.http404
+	return nil
 }
 
 func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, l *LARS) {
-	h = r.lars.http404
+	return r.find(method, path, ctx, r.lars.FixTrailingSlash, false)
+}
+
+func (r *router) find(method, path string, ctx *Context, fixTrailingSlash bool, callingFromNotFound bool) (h HandlerFunc, l *LARS) {
 	l = r.lars
 	cn := r.tree // Current node as root
 
@@ -322,7 +330,8 @@ func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, l *LARS
 				goto MatchAny
 			} else {
 				// Not found
-				return
+				goto NotFound
+				// return
 			}
 		}
 
@@ -367,14 +376,14 @@ func (r *router) Find(method, path string, ctx *Context) (h HandlerFunc, l *LARS
 	MatchAny:
 		if cn = cn.findChildByKind(mkind); cn == nil {
 			// Not found
-			return
+			goto NotFound
+			// return
 		}
 		ctx.pvalues[len(cn.pnames)-1] = search
 		goto End
 	}
 
 End:
-
 	ctx.path = cn.ppath
 	ctx.pnames = cn.pnames
 	h = cn.findHandler(method)
@@ -388,8 +397,16 @@ End:
 
 		h = cn.check405(l.lars)
 
+		if h == nil {
+			goto NotFound
+		}
+
 		// Dig further for match-any, might have an empty value for *, e.g.
 		if cn = cn.findChildByKind(mkind); cn == nil {
+			// Not Found
+			// if h == nil {
+			// 	goto NotFound
+			// }
 			return
 		}
 
@@ -398,7 +415,60 @@ End:
 		if h = cn.findHandler(method); h == nil {
 			h = cn.check405(l.lars)
 		}
+
+		if h == nil {
+			goto NotFound
+		}
 	}
 
 	return
+
+NotFound:
+
+	// Trailing Slash Checks + Case Insensitive
+	//
+	if !fixTrailingSlash {
+		if !callingFromNotFound {
+			h = l.http404
+		}
+		return
+	}
+
+	path = strings.ToLower(path)
+
+	// Check Same path, but all lowercase
+	if h, l = r.find(method, path, ctx, false, true); h != nil {
+		h = redirect(path, method)
+		return
+	}
+
+	// determine if has a slash at end and add or remove it
+	if path[len(path)-1:] == basePath {
+		path = path[:len(path)-1]
+	} else {
+		path = path + basePath
+	}
+
+	// Check lowercased path with opposite adding or removing slash
+	if h, l = r.find(method, path, ctx, false, true); h != nil {
+		h = redirect(path, method)
+		return
+	}
+
+	h = l.http404
+
+	return
+
+}
+
+func redirect(url, method string) (h HandlerFunc) {
+
+	code := http.StatusMovedPermanently
+	if method != GET {
+		code = http.StatusTemporaryRedirect
+	}
+
+	return func(c *Context) {
+		http.Redirect(c.Response, c.Request, url, code)
+	}
 }

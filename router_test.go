@@ -520,6 +520,56 @@ func TestRouterAPI(t *testing.T) {
 	}
 }
 
+func TestRedirectFunctionality(t *testing.T) {
+
+	l := New()
+	l.FixTrailingSlash = false
+
+	r := l.router
+
+	// Routes
+	r.add(GET, "/users", func(c *Context) {}, l)
+	r.add(POST, "/users/add", func(c *Context) {}, l)
+
+	c, _ := request(GET, "/users", l)
+	Equal(t, c, http.StatusOK)
+
+	c, _ = request(GET, "/Users", l)
+	Equal(t, c, http.StatusNotFound)
+
+	c, _ = request(GET, "/users/", l)
+	Equal(t, c, http.StatusNotFound)
+
+	c, _ = request(GET, "/Users/", l)
+	Equal(t, c, http.StatusNotFound)
+
+	c, _ = request(POST, "/users/add", l)
+	Equal(t, c, http.StatusOK)
+
+	c, _ = request(POST, "/Users/Add", l)
+	Equal(t, c, http.StatusNotFound)
+
+	l.FixTrailingSlash = true
+
+	c, _ = request(GET, "/users", l)
+	Equal(t, c, http.StatusOK)
+
+	c, _ = request(GET, "/Users", l)
+	Equal(t, c, http.StatusMovedPermanently)
+
+	c, _ = request(GET, "/users/", l)
+	Equal(t, c, http.StatusMovedPermanently)
+
+	c, _ = request(GET, "/Users/", l)
+	Equal(t, c, http.StatusMovedPermanently)
+
+	c, _ = request(POST, "/users/add", l)
+	Equal(t, c, http.StatusOK)
+
+	c, _ = request(POST, "/Users/Add", l)
+	Equal(t, c, http.StatusTemporaryRedirect)
+}
+
 func TestRouterServeHTTP(t *testing.T) {
 	r := New()
 	r.Get("/users", func(*Context) {})

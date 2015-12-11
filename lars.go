@@ -20,6 +20,17 @@ type LARS struct {
 	http404       HandlerFunc
 	newGlobals    GlobalsFunc
 	globalsExists bool
+
+	// Enables automatic redirection if the current route can't be matched but a
+	// handler for the path with (without) the trailing slash exists.
+	// For example if /foo/ is requested but a route only exists for /foo, the
+	// client is redirected to /foo with http status code 301 for GET requests
+	// and 307 for all other request methods.
+	// Order of checks:
+	// > Attempts to find the same path but all lowercase
+	// > Attempts to find by adding or removing slash
+	// > Falls Back to Not Found Handler
+	FixTrailingSlash bool
 }
 
 type route struct {
@@ -112,6 +123,8 @@ const (
 
 	default404Body = "404 page not found"
 	default405Body = "405 method not allowed"
+
+	basePath = "/"
 )
 
 var (
@@ -141,10 +154,12 @@ var (
 )
 
 // New creates an instance of lars.
+// FixTrailingSlash defaults to true
 func New() *LARS {
 	l := &LARS{
-		maxParam: new(int),
-		http404:  defaultNotFoundHandler,
+		FixTrailingSlash: true,
+		maxParam:         new(int),
+		http404:          defaultNotFoundHandler,
 		newGlobals: func() IGlobals {
 			return nil
 		},
